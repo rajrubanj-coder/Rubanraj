@@ -1,0 +1,375 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model for Authentication
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  password           String
+  firstName          String
+  lastName           String
+  phone              String?
+  avatar             String?
+  isEmailVerified    Boolean   @default(false)
+  emailVerificationToken String?
+  emailVerificationExpiry DateTime?
+  isTwoFactorEnabled Boolean   @default(false)
+  twoFactorSecret    String?
+  resetPasswordToken String?
+  resetPasswordExpiry DateTime?
+  role               Role      @default(EMPLOYEE)
+  status             UserStatus @default(ACTIVE)
+  lastLogin          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  employee           Employee?
+  sessions           Session[]
+  timesheets         Timesheet[]
+  leaves             Leave[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+
+  @@index([email])
+  @@index([role])
+}
+
+// Employee Model
+model Employee {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  employeeId        String    @unique
+  firstName         String
+  lastName          String
+  email             String    @unique
+  phone             String?
+  dateOfBirth       DateTime?
+  gender            String?
+  department        String
+  designation       String
+  joinDate          DateTime
+  salary            Float?
+  reportingTo       String?
+  status            EmployeeStatus @default(ACTIVE)
+  profileImage      String?
+  address           String?
+  city              String?
+  state             String?
+  country           String?
+  pinCode           String?
+  emergencyContact  String?
+  emergencyPhone    String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timesheets        Timesheet[]
+  leaves            Leave[]
+  projectAssignments ProjectAssignment[]
+  auditLogs         AuditLog[]
+
+  @@index([employeeId])
+  @@index([department])
+  @@index([designation])
+  @@index([userId])
+}
+
+// Department Model
+model Department {
+  id                String    @id @default(cuid())
+  name              String    @unique
+  description       String?
+  headOfDepartment  String?
+  budget            Float?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([name])
+}
+
+// Project Model
+model Project {
+  id                String    @id @default(cuid())
+  name              String    @unique
+  description       String?
+  startDate         DateTime
+  endDate           DateTime?
+  budget            Float?
+  status            ProjectStatus @default(ACTIVE)
+  projectManager    String?
+  clientName        String?
+  priority          Priority  @default(MEDIUM)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  assignments       ProjectAssignment[]
+  timesheets        Timesheet[]
+
+  @@index([name])
+  @@index([status])
+}
+
+// Project Assignment Model
+model ProjectAssignment {
+  id                String    @id @default(cuid())
+  projectId         String
+  employeeId        String
+  assignedDate      DateTime  @default(now())
+  unassignedDate    DateTime?
+  allocatedHours    Float?
+  role              String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee          Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, employeeId])
+  @@index([projectId])
+  @@index([employeeId])
+}
+
+// Timesheet Model
+model Timesheet {
+  id                String    @id @default(cuid())
+  employeeId        String
+  userId            String
+  projectId         String?
+  weekStartDate     DateTime
+  weekEndDate       DateTime
+  monday            Float     @default(0)
+  tuesday           Float     @default(0)
+  wednesday         Float     @default(0)
+  thursday          Float     @default(0)
+  friday            Float     @default(0)
+  saturday          Float     @default(0)
+  sunday            Float     @default(0)
+  totalHours        Float     @default(0)
+  overtimeHours     Float     @default(0)
+  workDescription   String?
+  status            TimesheetStatus @default(DRAFT)
+  approvedBy        String?
+  approvedAt        DateTime?
+  rejectionReason   String?
+  submittedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  employee          Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project           Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  dailyEntries      TimesheetEntry[]
+
+  @@unique([employeeId, weekStartDate])
+  @@index([employeeId])
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+}
+
+// Timesheet Daily Entry Model
+model TimesheetEntry {
+  id                String    @id @default(cuid())
+  timesheetId       String
+  date              DateTime
+  dayOfWeek         String
+  hoursWorked       Float
+  taskDescription   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  timesheet         Timesheet @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+
+  @@index([timesheetId])
+  @@index([date])
+}
+
+// Leave Model
+model Leave {
+  id                String    @id @default(cuid())
+  employeeId        String
+  userId            String
+  leaveType         LeaveType
+  startDate         DateTime
+  endDate           DateTime
+  numberOfDays      Float
+  reason            String?
+  status            LeaveStatus @default(PENDING)
+  approvedBy        String?
+  approvedAt        DateTime?
+  rejectionReason   String?
+  attachmentUrl     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  employee          Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([userId])
+  @@index([leaveType])
+  @@index([status])
+}
+
+// Leave Balance Model
+model LeaveBalance {
+  id                String    @id @default(cuid())
+  employeeId        String    @unique
+  year              Int
+  annualLeave       Float     @default(20)
+  annualLeaveUsed   Float     @default(0)
+  sickLeave         Float     @default(10)
+  sickLeaveUsed     Float     @default(0)
+  casualLeave       Float     @default(10)
+  casualLeaveUsed   Float     @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([year])
+}
+
+// Notification Model
+model Notification {
+  id                String    @id @default(cuid())
+  userId            String
+  type              NotificationType
+  title             String
+  message           String
+  relatedId         String?
+  isRead            Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+// Audit Log Model
+model AuditLog {
+  id                String    @id @default(cuid())
+  userId            String
+  employeeId        String?
+  action            String
+  tableName         String
+  recordId          String?
+  changes           String?   // JSON stringified
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employee          Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// Session Model for NextAuth
+model Session {
+  id                String    @id @default(cuid())
+  sessionToken      String    @unique
+  userId            String
+  expires           DateTime
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Enums
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  RESIGNED
+  RETIRED
+}
+
+enum TimesheetStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  CASUAL
+  MATERNITY
+  PATERNITY
+  UNPAID
+  LEAVE_WITHOUT_PAY
+}
+
+enum ProjectStatus {
+  ACTIVE
+  INACTIVE
+  COMPLETED
+  CANCELLED
+  ON_HOLD
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum NotificationType {
+  TIMESHEET_REMINDER
+  LEAVE_REQUEST
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  TIMESHEET_APPROVED
+  TIMESHEET_REJECTED
+  SYSTEM_ALERT
+  INFO
+}
